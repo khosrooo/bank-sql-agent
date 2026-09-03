@@ -1,0 +1,32 @@
+# متغیرهای محیطی (شامل کلید API — هرگز کامیت نشود)
+.env
+
+# فایل‌های لاگ تولیدشده در هر اجرا
+sql_agent_log_*.txt
+*.md.bak
+
+# محیط‌های مجازی پایتون
+.venv/
+venv/
+env/
+
+# کش‌های پایتون
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ابزارهای بسته‌بندی/بیلد
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ابزارهای ادیتور/IDE
+.vscode/
+.idea/
+.DS_Store
+
+# کش تست/lint
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
