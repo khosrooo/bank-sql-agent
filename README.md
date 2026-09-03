@@ -1,93 +1,80 @@
 # Bank SQL Agent
 
-دستیار هوشمند Text-to-SQL برای یک دیتابیس بانکی، پیاده‌سازی‌شده با **LangGraph**.
-سوال فارسیِ کاربر را به کوئری SQL تبدیل می‌کند، در صورت خطای ساختاری تا ۳ بار
-خودش را اصلاح می‌کند، نتیجه را از نظر منطقی هم یک‌بار بررسی می‌کند، و در نهایت
-پاسخ را به‌صورت طبیعی و زنده (streaming) به کاربر نمایش می‌دهد.
+A Text-to-SQL agent for a banking database, built with **LangGraph**. Converts Persian user queries into SQL, self-corrects syntax errors up to 3 times, runs a single semantic check on the result, and streams the final answer back to the user.
 
-## ساختار پروژه
+## Project Structure
 
-```
+```text
 bank-sql-agent/
 ├── README.md
-├── LICENSE
 ├── .gitignore
 ├── .env.example
 ├── requirements.txt
 ├── bank_database.db
 └── src/
     └── bank_sql_agent/
-        ├── __init__.py        # نسخه‌ی پکیج
-        ├── __main__.py        # نقطه‌ی ورود (python -m bank_sql_agent)
-        ├── main.py            # حلقه‌ی تعاملی خط‌فرمان + لاگ فایل
-        ├── config.py          # بارگذاری .env و مسیر دیتابیس
-        ├── database.py        # اتصال SQLDatabase + متن اسکیما
-        ├── llm.py             # راه‌اندازی مدل زبانی
-        ├── prompts/           # پرامپت‌های هر مرحله (تولید/اصلاح/بررسی/پاسخ)
-        ├── chains/            # زنجیره‌های LangChain متناظر با هر پرامپت
-        ├── tools/              # ابزار (Tool) اجرای SQL روی دیتابیس
-        ├── graph/              # State + گره‌ها + ساخت StateGraph
-        ├── ui/                 # رنگ/آیکون ترمینال + لاگر Tee
-        └── utils/              # توابع کمکیِ مشترک (پاک‌سازی خروجی SQL)
+        ├── __init__.py        # Package version
+        ├── __main__.py        # Entry point (python -m bank_sql_agent)
+        ├── main.py            # Interactive CLI loop + file logging
+        ├── config.py          # .env loading and database path
+        ├── database.py        # SQLDatabase connection + schema text
+        ├── llm.py             # LLM initialization
+        ├── prompts/           # Prompts for each stage (generate/fix/check/finalize)
+        ├── chains/            # LangChain chains for each prompt
+        ├── tools/             # SQL execution tool
+        ├── graph/             # State, nodes, and StateGraph
+        ├── ui/                # Terminal colors/icons + Tee logger
+        └── utils/             # Shared helpers (e.g., SQL output cleanup)
 ```
 
-## معماری ایجنت (LangGraph)
+## Agent Architecture (LangGraph)
 
-```
-generate_sql → execute_sql ⇄ fix_syntax   (حداکثر ۳ بار، حلقه‌ی واقعی)
+```text
+generate_sql → execute_sql ⇄ fix_syntax   (max 3 attempts, real graph loop)
                     │
-                    ▼ (وقتی موفق شد)
-              semantic_check              (فقط یک‌بار، بدون یال برگشتی)
+                    ▼ (on success)
+              semantic_check              (runs once, no back edges)
                     │
         ┌───────────┴───────────┐
         ▼                       ▼
   semantic_execute          finalize
         │                       │
         └───────────┬───────────┘
-                     ▼
-                  answer (پاسخ نهایی، Streaming)
+                    ▼
+                 answer (final response, streamed)
 ```
 
-- **مسیر سینتکسی** یک حلقه‌ی واقعیِ گراف است (`execute_sql ⇄ fix_syntax`) و
-  با شمارنده‌ی `attempt` در برابر `max_syntactic_attempts` کنترل می‌شود.
-- **مسیر معنایی** هیچ یال برگشتی ندارد — از نظر توپولوژی گراف اصلاً امکان
-  لوپ‌شدن ندارد، نه فقط با یک شرط کدی.
-- تنها ابزار (`@tool`) پروژه، اجرای SQL روی دیتابیس است؛ مستقیم و قطعی از
-  کد صدا زده می‌شود، نه توسط تصمیم خودکار مدل.
+- **Syntactic path**: a real graph loop (`execute_sql` ⇄ `fix_syntax`), controlled by an `attempt` counter against `max_syntactic_attempts`.
+- **Semantic path**: no back edges — the graph is topologically unable to loop at this stage.
+- **Tool execution**: the only tool in the project is the SQL executor. It is called directly from code, not by the model's autonomous tool-calling.
 
-## نصب و اجرا
+## Installation & Usage
 
 ```bash
-# ۱) نصب وابستگی‌ها
+# 1. Install dependencies
 pip install -r requirements.txt
 
-# ۲) کپی و تنظیم متغیرهای محیطی (در ریشه‌ی پروژه)
+# 2. Configure environment variables (in the project root)
 cp .env.example .env
-# سپس OPENAI_API_KEY و OPENAI_API_BASE را در .env مقداردهی کنید
+# Set OPENAI_API_KEY and OPENAI_API_BASE in .env
 
-# ۳) دیتابیس bank_database.db را در ریشه‌ی پروژه (کنار پوشه‌ی src/) قرار دهید
+# 3. Place bank_database.db in the project root (next to src/)
 
-# ۴) اجرا — از داخل پوشه‌ی src (نیازی به نصب/pyproject.toml نیست)
+# 4. Run (from inside src/ — no pyproject.toml install needed)
 cd src
 python -m bank_sql_agent
 ```
 
-برای خروج از حلقه‌ی تعاملی، کافی است بنویسید: `خروج` یا `exit`.
+To exit the interactive loop, type `exit` or `خروج`.
 
-هر جلسه یک فایل لاگ به‌صورت `sql_agent_log_YYYYMMDD_HHMMSS.txt` در همان
-مسیر اجرا ذخیره می‌شود (بدون کدهای رنگیِ ANSI، برای خوانایی در ادیتور).
+Each session writes a log file named `sql_agent_log_YYYYMMDD_HHMMSS.txt` in the working directory. ANSI color codes are stripped so the log stays readable in any text editor.
 
-## پیکربندی مدل
+## Model Configuration
 
-پیش‌فرض پروژه از یک endpoint سازگار با OpenAI (مثلاً پراکسیِ Gemini) استفاده
-می‌کند؛ آدرس و کلید آن در `.env` تنظیم می‌شود (`llm.py` → `init_llm`).
+The project uses an OpenAI-compatible endpoint (e.g., a Gemini proxy). Base URL and API key are set in `.env` — see `llm.py` → `init_llm`.
 
-## دیتابیس
+## Database
 
-فایل `bank_database.db` باید در ریشه‌ی پروژه (کنار پوشه‌ی `src/`) قرار داشته
-باشد. جداول اصلی: `Customer`، `Account`، `"Transaction"`، `Transfer`
-(جزئیات کامل روابط در `database.py` → `get_schema_text`).
+`bank_database.db` must be in the project root (next to `src/`).
 
-## لایسنس
-
-MIT — به فایل [LICENSE](./LICENSE) مراجعه کنید.
+Main tables: `Customer`, `Account`, `"Transaction"`, `Transfer`. Full schema details are in `database.py` → `get_schema_text`.
